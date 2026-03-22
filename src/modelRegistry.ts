@@ -45,6 +45,10 @@ const OPENCODE_GO_NPM_OVERRIDES: Record<string, string> = {
 	'minimax-m2.5': '@ai-sdk/openai-compatible',
 };
 
+// Note: models.dev says minimax models use @ai-sdk/anthropic (routes to /messages endpoint),
+// but that endpoint returns "Missing API key" errors. The /chat/completions endpoint works,
+// so we override to @ai-sdk/openai-compatible for these models.
+
 export class ModelRegistry {
 	private readonly _onDidChange = new vscode.EventEmitter<void>();
 	readonly onDidChange = this._onDidChange.event;
