@@ -62,6 +62,7 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 		token.onCancellationRequested(() => abortController.abort());
 
 		const toolMode = options.toolMode === vscode.LanguageModelChatToolMode.Required ? 'required' : 'auto';
+		const effectiveToolMode = model.id.endsWith('-go') && toolMode === 'required' ? 'auto' : toolMode;
 		const providerInfo = await this.registry.getModelProviderInfo(model.id);
 		const requestMeta = await getOrCreateRequestMetadata(this.context, options);
 		const toolNameMap = buildToolNameMap(options.tools, providerInfo?.npm);
@@ -109,10 +110,10 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 			await streamZen(
 				{
 					apiKey,
-					modelId: model.id,
+					modelId: providerInfo?.originalModelId ?? model.id,
 					messages: cachedMessages,
 					tools,
-					toolMode,
+					toolMode: effectiveToolMode,
 					abortSignal: abortController.signal,
 					providerOptions,
 					providerNpm: providerInfo?.npm,

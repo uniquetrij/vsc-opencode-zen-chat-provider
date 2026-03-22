@@ -53,7 +53,7 @@ export class ModelRegistry {
 	private cachedModels: vscode.LanguageModelChatInformation[] | undefined;
 	private providerDefaults: Map<string, { npm: string; api: string }> = new Map();
 	private modelProviderOverrides = new Map<string, string>();
-	private modelRequestMetadata = new Map<string, { headers?: Record<string, string>; options?: Record<string, unknown> }>();
+	private modelRequestMetadata = new Map<string, { headers?: Record<string, string>; options?: Record<string, unknown>; originalModelId?: string }>();
 	private modelProviderApi = new Map<string, string>();
 
 	constructor(private readonly context: vscode.ExtensionContext) {}
@@ -121,6 +121,7 @@ export class ModelRegistry {
 				this.modelRequestMetadata.set(uniqueId, {
 					headers: model.headers,
 					options: model.options,
+					originalModelId: model.id,
 				});
 			}
 		}
@@ -138,7 +139,7 @@ export class ModelRegistry {
 		return models;
 	}
 
-	async getModelProviderInfo(modelId: string): Promise<{ npm: string; api: string; headers?: Record<string, string>; options?: Record<string, unknown> } | undefined> {
+	async getModelProviderInfo(modelId: string): Promise<{ npm: string; api: string; headers?: Record<string, string>; options?: Record<string, unknown>; originalModelId?: string } | undefined> {
 		if (!this.cachedModels) {
 			await this.getModels();
 		}
@@ -157,6 +158,7 @@ export class ModelRegistry {
 			api: providerInfo?.api ?? 'unknown',
 			headers: metadata?.headers,
 			options: metadata?.options,
+			originalModelId: metadata?.originalModelId,
 		};
 	}
 
