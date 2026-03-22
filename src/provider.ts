@@ -390,7 +390,7 @@ function buildToolNameMap(
 		return { toProvider, toVsCode };
 	}
 
-	const needsSanitize = providerNpm === '@ai-sdk/anthropic' || providerNpm === '@ai-sdk/openai';
+	const needsSanitize = providerNpm === '@ai-sdk/anthropic' || providerNpm === '@ai-sdk/openai' || providerNpm === '@ai-sdk/openai-compatible';
 	const used = new Set<string>();
 
 	for (const tool of tools) {
