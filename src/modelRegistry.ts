@@ -130,6 +130,10 @@ export class ModelRegistry {
 			}
 		}
 
+		if (this.providerDefaults.size === 0) {
+			throw new Error(`No valid providers (${PROVIDER_IDS.join(', ')}) found in models.dev`);
+		}
+
 		const isActiveModel = (model: ModelsDevModel) => model.status === undefined || model.status !== 'deprecated';
 		const hasKey = options.hasKey ?? true;
 		const models = allModels
@@ -155,7 +159,10 @@ export class ModelRegistry {
 		const override = this.modelProviderOverrides.get(modelId);
 		const metadata = this.modelRequestMetadata.get(modelId);
 		const providerId = this.modelProviderApi.get(modelId);
-		const providerInfo = providerId ? this.providerDefaults.get(providerId) : this.providerDefaults.values().next().value;
+		if (!providerId) {
+			return undefined;
+		}
+		const providerInfo = this.providerDefaults.get(providerId);
 
 		return {
 			npm: override ?? providerInfo?.npm ?? 'unknown',
