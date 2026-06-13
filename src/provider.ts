@@ -103,6 +103,20 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 		);
 		const requestHeaders = buildRequestHeaders(requestMeta, providerInfo?.headers);
 
+		// Truncate messages to stay within the model's context window.
+		// Reserve ~15% for tool schemas, system overhead, and output space.
+		const maxInputTokens = model.maxInputTokens ?? 1048576;
+		const truncationBudget = Math.floor(maxInputTokens * 0.85);
+		const { messages: truncatedMessages, dropped } = truncateMessages(cachedMessages, truncationBudget);
+		if (dropped > 0) {
+			const output = getOutputChannel();
+			output.info(
+				`Context limit: dropped ${dropped} older message(s) to fit within ~${truncationBudget.toLocaleString()} token budget ` +
+				`(model max: ${maxInputTokens.toLocaleString()} tokens).`
+			);
+		}
+		cachedMessages = truncatedMessages;
+
 		if (debugFlag) {
 			logDebugRequest(model, requestModelId, requestToolMode, options, coreMessages, tools, providerInfo, providerOptions);
 		}
@@ -199,6 +213,141 @@ function messagesToAiSdkMessages(
 	}
 
 	return out;
+}
+
+// ---------------------------------------------------------------------------
+// Message truncation to stay within context limits
+// ---------------------------------------------------------------------------
+
+/** Estimate token count for a single AI SDK message (rough: ~4 chars/token). */
+function estimateMessageTokens(message: any): number {
+	try {
+		const serialized = JSON.stringify(message);
+		return Math.max(1, Math.ceil(serialized.length / 4));
+	} catch {
+		return 100;
+	}
+}
+
+/** Total estimated tokens across an array of AI SDK messages. */
+function estimateTotalTokens(messages: any[]): number {
+	let total = 0;
+	for (const msg of messages) {
+		total += estimateMessageTokens(msg);
+	}
+	return total;
+}
+
+/**
+ * Drop older messages to fit within the model's context window.
+ *
+ * Strategy:
+ *  1. Keep all system messages at the start.
+ *  2. From the remaining messages, drop the oldest until estimated tokens
+ *     fit within `budgetTokens` (maxInputTokens minus a safety margin).
+ *  3. Always preserve the final user message so the model has something to
+ *     respond to.
+ *  4. Never break a tool-call / tool-result pair: if we drop an assistant
+ *     message containing a tool-call, we also drop the next tool-result, and
+ *     vice versa.
+ */
+function truncateMessages(
+	messages: any[],
+	budgetTokens: number
+): { messages: any[]; dropped: number } {
+	const estimated = estimateTotalTokens(messages);
+	if (estimated <= budgetTokens) {
+		return { messages, dropped: 0 };
+	}
+
+	// Separate leading system messages from the rest.
+	const systemMessages: any[] = [];
+	const nonSystemMessages: any[] = [];
+	for (const msg of messages) {
+		if (msg.role === 'system') {
+			systemMessages.push(msg);
+		} else {
+			nonSystemMessages.push(msg);
+		}
+	}
+
+	const systemTokens = estimateTotalTokens(systemMessages);
+	const targetForNonSystem = Math.max(1, budgetTokens - systemTokens);
+
+	// If system messages alone exceed budget, drop all but the first.
+	if (systemTokens > budgetTokens && systemMessages.length > 1) {
+		const keepSystem = [systemMessages[0]];
+		const keepTokens = estimateMessageTokens(systemMessages[0]);
+		const keepNonSystem = truncateNonSystemMessages(nonSystemMessages, budgetTokens - keepTokens);
+		return {
+			messages: [...keepSystem, ...keepNonSystem],
+			dropped: messages.length - 1 - keepNonSystem.length,
+		};
+	}
+
+	const keepNonSystem = truncateNonSystemMessages(nonSystemMessages, targetForNonSystem);
+	const dropped = nonSystemMessages.length - keepNonSystem.length;
+
+	return {
+		messages: [...systemMessages, ...keepNonSystem],
+		dropped,
+	};
+}
+
+/**
+ * Drop oldest non-system messages to fit within a token budget.
+ * Keeps the most recent user message and respects tool-call/tool-result pairs.
+ */
+function truncateNonSystemMessages(messages: any[], budgetTokens: number): any[] {
+	if (messages.length === 0) {
+		return [];
+	}
+
+	const estimated = estimateTotalTokens(messages);
+	if (estimated <= budgetTokens) {
+		return messages;
+	}
+
+	// Start removing from the front, keeping a sliding window.
+	const kept: any[] = [];
+	let keptTokens = 0;
+
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const msg = messages[i];
+		const msgTokens = estimateMessageTokens(msg);
+
+		// If adding this message would exceed budget, stop.
+		// But always keep at least the last message.
+		if (kept.length > 0 && keptTokens + msgTokens > budgetTokens) {
+			break;
+		}
+
+		kept.unshift(msg);
+		keptTokens += msgTokens;
+	}
+
+	// Validate tool-call / tool-result pairs: if the first kept message is a
+	// tool message whose corresponding tool-call was dropped, drop it too.
+	while (kept.length > 1) {
+		const first = kept[0];
+		if (first.role === 'tool') {
+			// The tool message references a toolCallId. If no assistant message
+			// before it contains a matching tool-call, drop it.
+			const toolCallId = first.content?.[0]?.toolCallId;
+			const hasMatchingCall = kept.some(
+				(m) => m.role === 'assistant' &&
+					Array.isArray(m.content) &&
+					m.content.some((p: any) => p.type === 'tool-call' && p.toolCallId === toolCallId)
+			);
+			if (!hasMatchingCall) {
+				kept.shift();
+				continue;
+			}
+		}
+		break;
+	}
+
+	return kept;
 }
 
 function mapVsCodeMessageToAiSdkMessages(
