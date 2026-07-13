@@ -3,8 +3,8 @@
 
 // Toggle a leading "DEBUG: " on the chat provider displayName in package.json.
 // Wired into the F5 debug flow (see .vscode/launch.json + tasks.json):
-//   - preLaunchTask runs `mark`   -> dev host shows "DEBUG: OpenCode Zen"
-//   - postDebugTask runs `unmark` -> working tree returns to canonical name
+//   - preLaunchTask runs `mark`   → dev host shows "DEBUG: OpenCode Zen"
+//   - postDebugTask runs `unmark` → working tree returns to canonical name
 // The committed manifest stays clean; the "DEBUG: " prefix only exists during a debug session.
 //
 // Usage: node scripts/dev-marker.js <mark|unmark>
@@ -21,36 +21,31 @@ if (mode !== 'mark' && mode !== 'unmark') {
 }
 
 const pkgPath = path.join(__dirname, '..', 'package.json');
-const pkgRaw = fs.readFileSync(pkgPath, 'utf8');
+const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 
-const providersBlockRe = /"languageModelChatProviders"\s*:\s*\[[\s\S]*?\]/m;
-const providersMatch = providersBlockRe.exec(pkgRaw);
-if (!providersMatch) {
-    console.error('dev-marker: no languageModelChatProviders in package.json - nothing to do.');
+const providers = pkg.contributes && pkg.contributes.languageModelChatProviders;
+if (!Array.isArray(providers) || providers.length === 0) {
+    console.error('dev-marker: no languageModelChatProviders in package.json — nothing to do.');
     process.exit(0);
 }
 
 let changed = false;
-const providersBlock = providersMatch[0];
-const nextProvidersBlock = providersBlock.replace(
-    /("displayName"\s*:\s*")([^"]*)(")/g,
-    (_all, start, currentName, end) => {
-        const stripped = currentName.replace(/^DEBUG: /, '');
-        const next = mode === 'mark' ? PREFIX + stripped : stripped;
-        if (next !== currentName) {
-            changed = true;
-        }
-        return `${start}${next}${end}`;
+for (const provider of providers) {
+    if (typeof provider.displayName !== 'string') {
+        continue;
     }
-);
+    // Strip any existing prefix first so repeated calls are idempotent.
+    const stripped = provider.displayName.replace(/^DEBUG: /, '');
+    const next = mode === 'mark' ? PREFIX + stripped : stripped;
+    if (next !== provider.displayName) {
+        provider.displayName = next;
+        changed = true;
+    }
+}
 
 if (changed) {
-    const nextRaw =
-        pkgRaw.slice(0, providersMatch.index) +
-        nextProvidersBlock +
-        pkgRaw.slice(providersMatch.index + providersBlock.length);
-    fs.writeFileSync(pkgPath, nextRaw, 'utf8');
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n');
     console.log(`dev-marker: ${mode} applied.`);
 } else {
-    console.log(`dev-marker: already ${mode === 'mark' ? 'marked' : 'unmarked'} - no change.`);
+    console.log(`dev-marker: already ${mode === 'mark' ? 'marked' : 'unmarked'} — no change.`);
 }
