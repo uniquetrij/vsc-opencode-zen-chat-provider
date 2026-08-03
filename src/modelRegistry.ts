@@ -136,11 +136,12 @@ export class ModelRegistry {
 
 		const isActiveModel = (model: ModelsDevModel) => model.status === undefined || model.status !== 'deprecated';
 		const hasKey = options.hasKey ?? true;
+		const debugMode = this.isDebugMode();
 		const models = allModels
 			.filter(({ model }) => isActiveModel(model))
 			.filter(({ model }) => hasKey || model.cost?.input === 0)
 			.sort((a, b) => a.model.name.localeCompare(b.model.name))
-			.map(({ provider, model, providerId, uniqueId }) => this.toChatInfo(provider, model, providerId, uniqueId));
+			.map(({ provider, model, providerId, uniqueId }) => this.toChatInfo(provider, model, providerId, uniqueId, debugMode));
 
 		this.cachedModels = models;
 		this.cachedAtMs = now;
@@ -173,13 +174,14 @@ export class ModelRegistry {
 		};
 	}
 
-	private toChatInfo(provider: ModelsDevProvider, model: ModelsDevModel, providerId: string, uniqueId: string): vscode.LanguageModelChatInformation {
+	private toChatInfo(provider: ModelsDevProvider, model: ModelsDevModel, providerId: string, uniqueId: string, debugMode: boolean): vscode.LanguageModelChatInformation {
 		const maxInputTokens = model.limit?.context ?? 32_768;
 		const maxOutputTokens = model.limit?.output ?? 8_192;
 		const costIn = model.cost?.input;
 		const costOut = model.cost?.output;
 		const isGo = providerId === 'opencode-go';
-		const modelName = isGo ? `${model.name} (Go)` : model.name;
+		const rawModelName = isGo ? `${model.name} (Go)` : model.name;
+		const modelName = debugMode ? `🛠 ${rawModelName}` : rawModelName;
 		const tooltipBits: string[] = [
 			provider.name + (isGo ? ' (Go)' : ''),
 			model.reasoning ? 'Reasoning' : undefined,
@@ -201,5 +203,9 @@ export class ModelRegistry {
 				imageInput: model.attachment,
 			},
 		};
+	}
+
+	private isDebugMode(): boolean {
+		return Boolean(this.context.extension.packageJSON['x-dev-marker-debug']);
 	}
 }
