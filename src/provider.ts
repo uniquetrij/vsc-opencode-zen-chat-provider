@@ -499,8 +499,8 @@ function dataPartToAiSdkPart(part: vscode.LanguageModelDataPart): any | undefine
 	}
 
 	if (part.mimeType.startsWith('image/')) {
-		// AI SDK accepts Buffer/Uint8Array.
-		return { type: 'image', image: Buffer.from(part.data), mimeType: part.mimeType };
+		// AI SDK accepts Buffer/Uint8Array. imagePartSchema uses `mediaType`, not `mimeType`.
+		return { type: 'image', image: Buffer.from(part.data), mediaType: part.mimeType };
 	}
 
 	// Fallback: represent as a file.
