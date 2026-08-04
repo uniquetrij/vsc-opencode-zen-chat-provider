@@ -6,7 +6,7 @@ import { ModelRegistry } from './modelRegistry';
 import { OPENAI_COMPAT_PROVIDER_NAME, streamZen } from './zenClient';
 import { getOutputChannel } from './output';
 
-export const VENDOR_ID = 'debug: opencode';
+export const VENDOR_ID = 'opencode-zen';
 
 export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly registry: ModelRegistry;

@@ -42,7 +42,7 @@
   "contributes": {
     "languageModelChatProviders": [
       {
-        "vendor": "debug: opencode",
+        "vendor": "opencode-zen",
         "displayName": "OpenCode Zen"
       }
     ],

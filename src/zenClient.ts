@@ -121,7 +121,7 @@ function normalizeToString(value: unknown): string {
 	}
 }
 
-export const OPENAI_COMPAT_PROVIDER_NAME = 'debug: opencode';
+export const OPENAI_COMPAT_PROVIDER_NAME = 'opencode-zen';
 
 export async function streamZen(
 	options: {
