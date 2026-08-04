@@ -106,7 +106,7 @@ export class ModelRegistry {
 			this.modelProviderApi.set(uniqueId, providerId);
 			allModels.push({ provider, model, providerId, uniqueId });
 
-			const npmOverride = providerId === 'opencode-go' ? OPENCODE_GO_NPM_OVERRIDES[model.id] : undefined;
+			const npmOverride = providerId.includes('opencode-go') ? OPENCODE_GO_NPM_OVERRIDES[model.id] : undefined;
 			if (npmOverride) {
 				this.modelProviderOverrides.set(uniqueId, npmOverride);
 			} else if (model.provider?.npm) {

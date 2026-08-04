@@ -126,6 +126,7 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 		}
 
 		const extensionDebugMode = isDebugModeFromDisk();
+		let debugPrefixEmitted = false;
 		try {
 			await streamZen(
 				{
@@ -146,14 +147,22 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 				{
 					onTextDelta: (delta) => {
 						if (delta) {
-							const prefixed = extensionDebugMode ? `===DEBUG===${delta}` : delta;
-							progress.report(new vscode.LanguageModelTextPart(prefixed));
+							if (extensionDebugMode && !debugPrefixEmitted) {
+								debugPrefixEmitted = true;
+								progress.report(new vscode.LanguageModelTextPart(`===DEBUG===${delta}`));
+							} else {
+								progress.report(new vscode.LanguageModelTextPart(delta));
+							}
 						}
 					},
 					onThinkingDelta: (delta) => {
 						if (delta) {
-							const prefixed = extensionDebugMode ? `===DEBUG===${delta}` : delta;
-							progress.report(new vscode.LanguageModelThinkingPart(prefixed));
+							if (extensionDebugMode && !debugPrefixEmitted) {
+								debugPrefixEmitted = true;
+								progress.report(new vscode.LanguageModelThinkingPart(`===DEBUG===${delta}`));
+							} else {
+								progress.report(new vscode.LanguageModelThinkingPart(delta));
+							}
 						}
 					},
 					onToolCall: ({ toolCallId, toolName, input }) => {
