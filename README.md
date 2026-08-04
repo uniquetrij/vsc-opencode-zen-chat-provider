@@ -3,7 +3,7 @@
 > **Disclaimer:** This project is a community project and is not maintained by the OpenCode team (https://opencode.ai/) and has no ties to the OpenCode team.
 
 
-This extension provides **OpenCode Zen** models to VS Code via the **Language Model Chat Provider** API (vendor id: `opencode`).
+This extension provides **OpenCode Zen** models to VS Code via the **Language Model Chat Provider** API (vendor id: `opencode-zen`).
 
 ## Prerequisites
 
@@ -39,6 +39,22 @@ vsce package
 1. Open this folder in VS Code
 2. Press `F5` (Run → Start Debugging)
 3. In the Extension Development Host, open Chat and enable the **OpenCode Zen** provider in the model picker.
+
+### Side-by-Side Debug With Installed Extension
+
+The debug host is configured to run as a separate dev flavor so it does not replace the installed extension:
+
+- Pre-launch task (`Dev Marker: Mark`) temporarily switches identity and namespaces to `-dev` variants.
+- Post-debug task (`Dev Marker: Unmark`) restores the canonical manifest values.
+
+During debug sessions, the extension uses distinct IDs/namespaces for:
+
+- extension identity (`name`/`publisher`)
+- chat provider vendor
+- command IDs
+- configuration keys
+
+This allows installed and debug providers to coexist without registration conflicts.
 
 ## Commands
 

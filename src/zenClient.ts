@@ -4,6 +4,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createOpenAI } from '@ai-sdk/openai';
 import { streamText, type ModelMessage } from 'ai';
 import { getOutputChannel } from './output';
+import { getRuntimeVendorId } from './runtimeMode';
 
 export const ZEN_BASE_URL = 'https://opencode.ai/zen/v1';
 
@@ -121,7 +122,7 @@ function normalizeToString(value: unknown): string {
 	}
 }
 
-export const OPENAI_COMPAT_PROVIDER_NAME = 'opencode-zen';
+export const OPENAI_COMPAT_PROVIDER_NAME = getRuntimeVendorId();
 
 export async function streamZen(
 	options: {

@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { getRuntimeConfigurationNamespace } from './runtimeMode';
 
 export type ModelsDevProvider = {
 	id: string;
@@ -73,8 +74,9 @@ export class ModelRegistry {
 	}
 
 	async getModels(options: { force?: boolean; hasKey?: boolean } = {}): Promise<vscode.LanguageModelChatInformation[]> {
+		const configurationNamespace = getRuntimeConfigurationNamespace();
 		const ttlMinutes = this.context.workspaceState.get<number>('opencodeZen.modelCacheTtlMinutes.override')
-			?? vscode.workspace.getConfiguration('opencodeZen').get<number>('modelCacheTtlMinutes', 60);
+			?? vscode.workspace.getConfiguration(configurationNamespace).get<number>('modelCacheTtlMinutes', 60);
 
 		const ttlMs = Math.max(0, ttlMinutes) * 60_000;
 		const now = Date.now();

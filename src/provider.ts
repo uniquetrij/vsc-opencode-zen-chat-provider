@@ -5,8 +5,9 @@ import { getApiKey } from './secrets';
 import { ModelRegistry } from './modelRegistry';
 import { OPENAI_COMPAT_PROVIDER_NAME, streamZen } from './zenClient';
 import { getOutputChannel } from './output';
+import { getRuntimeConfigurationNamespace, getRuntimeVendorId } from './runtimeMode';
 
-export const VENDOR_ID = 'opencode-zen';
+export const VENDOR_ID = getRuntimeVendorId();
 
 export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly registry: ModelRegistry;
@@ -662,7 +663,7 @@ type RequestMetadata = {
 };
 
 function getPromptCachingConfig(): PromptCachingConfig {
-	const config = vscode.workspace.getConfiguration('opencodeZen');
+	const config = vscode.workspace.getConfiguration(getRuntimeConfigurationNamespace());
 	return {
 		enabled: config.get<boolean>('promptCaching.enabled', true),
 		retention: config.get<'in_memory' | '24h'>('promptCaching.retention', 'in_memory'),

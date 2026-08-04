@@ -2,8 +2,14 @@ import * as vscode from 'vscode';
 import { OpenCodeZenChatProvider, VENDOR_ID } from './provider';
 import { getOutputChannel } from './output';
 import { clearApiKey, setApiKey } from './secrets';
+import { getRuntimeCommandNamespace } from './runtimeMode';
 
-const SELF_TEST_TOOL_NAME = 'opencodeZen.selfTest.getTime';
+const COMMAND_NAMESPACE = getRuntimeCommandNamespace();
+const COMMAND_SET_API_KEY = `${COMMAND_NAMESPACE}.setApiKey`;
+const COMMAND_CLEAR_API_KEY = `${COMMAND_NAMESPACE}.clearApiKey`;
+const COMMAND_REFRESH_MODELS = `${COMMAND_NAMESPACE}.refreshModels`;
+const COMMAND_SELF_TEST = `${COMMAND_NAMESPACE}.selfTest`;
+const SELF_TEST_TOOL_NAME = `${COMMAND_NAMESPACE}.selfTest.getTime`;
 
 export function activate(context: vscode.ExtensionContext) {
 	const output = getOutputChannel();
@@ -13,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		output,
-		vscode.commands.registerCommand('opencodeZen.setApiKey', async () => {
+		vscode.commands.registerCommand(COMMAND_SET_API_KEY, async () => {
 			const key = await vscode.window.showInputBox({
 				prompt: 'Enter your OpenCode API key (OPENCODE_API_KEY)',
 				password: true,
@@ -26,16 +32,16 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.window.showInformationMessage('OpenCode Zen API key saved.');
 			provider.refreshModels();
 		}),
-		vscode.commands.registerCommand('opencodeZen.clearApiKey', async () => {
+		vscode.commands.registerCommand(COMMAND_CLEAR_API_KEY, async () => {
 			await clearApiKey(context.secrets);
 			vscode.window.showInformationMessage('OpenCode Zen API key cleared.');
 			provider.refreshModels();
 		}),
-		vscode.commands.registerCommand('opencodeZen.refreshModels', async () => {
+		vscode.commands.registerCommand(COMMAND_REFRESH_MODELS, async () => {
 			await provider.refreshModels(true);
 			vscode.window.showInformationMessage('OpenCode Zen model list refreshed.');
 		}),
-		vscode.commands.registerCommand('opencodeZen.selfTest', async () => {
+		vscode.commands.registerCommand(COMMAND_SELF_TEST, async () => {
 			if (!vscode.lm?.selectChatModels) {
 				output.error('VS Code Language Model API unavailable. Update VS Code to 1.104+.');
 				vscode.window.showWarningMessage('OpenCode Zen requires VS Code 1.104+ to run the self-test.');
