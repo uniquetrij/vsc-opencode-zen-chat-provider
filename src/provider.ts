@@ -71,7 +71,7 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 		const requestMeta = await getOrCreateRequestMetadata(this.context, options);
 		const toolNameMap = buildToolNameMap(options.tools, providerInfo?.npm);
 		const tools = options.tools ? toolsToAiSdkTools(options.tools, toolNameMap.toProvider) : undefined;
-		const coreMessages = messagesToAiSdkMessages(messages, toolNameMap.toProvider);
+		const coreMessages = messagesToAiSdkMessages(messages, toolNameMap.toProvider, providerInfo?.npm);
 		const promptCaching = getPromptCachingConfig();
 		const promptCacheKey =
 			promptCaching.enabled && promptCaching.cacheKeyScope !== 'none'
@@ -195,7 +195,8 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 
 function messagesToAiSdkMessages(
 	messages: readonly vscode.LanguageModelChatRequestMessage[],
-	toolNameMap: ReadonlyMap<string, string>
+	toolNameMap: ReadonlyMap<string, string>,
+	providerNpm?: string
 ): any[] {
 	// We use `any` to avoid hard-coupling to ai-sdk's evolving CoreMessage shape.
 	// But we must still satisfy AI SDK runtime validation.
@@ -211,7 +212,7 @@ function messagesToAiSdkMessages(
 	const out: any[] = [];
 
 	for (const message of messages) {
-		const mapped = mapVsCodeMessageToAiSdkMessages(message, toolNameByCallId, toolNameMap);
+		const mapped = mapVsCodeMessageToAiSdkMessages(message, toolNameByCallId, toolNameMap, providerNpm);
 		out.push(...mapped);
 	}
 
@@ -356,13 +357,15 @@ function truncateNonSystemMessages(messages: any[], budgetTokens: number): any[]
 function mapVsCodeMessageToAiSdkMessages(
 	message: vscode.LanguageModelChatRequestMessage,
 	toolNameByCallId: ReadonlyMap<string, string>,
-	toolNameMap: ReadonlyMap<string, string>
+	toolNameMap: ReadonlyMap<string, string>,
+	providerNpm?: string
 ): any[] {
 	const isUser = message.role === vscode.LanguageModelChatMessageRole.User;
 
 	const textImageFileParts: any[] = [];
 	const toolResultParts: any[] = [];
 	const assistantParts: any[] = [];
+	const thinkingTexts: string[] = [];
 
 	for (const part of message.content) {
 		if (part instanceof vscode.LanguageModelTextPart) {
@@ -406,7 +409,38 @@ function mapVsCodeMessageToAiSdkMessages(
 			if (isUser) {
 				textImageFileParts.push(converted);
 			} else {
+				// The AI SDK's assistant ModelMessage schema does not allow `image`
+				// parts (only user messages do) — sending one makes streamText
+				// reject the whole request. Represent it as a `file` part instead,
+				// which IS allowed for assistant messages: the Google provider
+				// actually sends PNG images from assistant turns to the model,
+				// while OpenAI/Anthropic providers ignore it (no error).
+				// Google throws on non-PNG assistant images, so drop those.
+				if (converted.type === 'image') {
+					if (providerNpm === '@ai-sdk/google' && !isGoogleAssistantPng(converted)) {
+						continue;
+					}
+					assistantParts.push({
+						type: 'file',
+						data: converted.image,
+						mediaType: converted.mediaType,
+					});
+					continue;
+				}
 				assistantParts.push(converted);
+			}
+			continue;
+		}
+
+		// Thinking parts from prior turns must be echoed back as reasoning_content.
+		const ThinkingPartClass = (vscode as any).LanguageModelThinkingPart as (new (...args: any[]) => any) | undefined;
+		if (ThinkingPartClass && part instanceof ThinkingPartClass) {
+			if (!isUser) {
+				const thinkingValue = (part as any).value;
+				const text = Array.isArray(thinkingValue) ? thinkingValue.join('') : String(thinkingValue ?? '');
+				if (text.length > 0) {
+					thinkingTexts.push(text);
+				}
 			}
 			continue;
 		}
@@ -424,10 +458,23 @@ function mapVsCodeMessageToAiSdkMessages(
 			out.push({ role: 'tool', content: toolResultParts });
 		}
 	} else {
-		out.push({ role: 'assistant', content: simplifyTextOnlyContent(assistantParts) });
+		const reasoningContent = thinkingTexts.join('');
+		const assistantMessage: any = { role: 'assistant', content: simplifyTextOnlyContent(assistantParts) };
+		if (reasoningContent.length > 0) {
+			// openaiCompatible providerOptions are spread into the API request by the SDK's getOpenAIMetadata.
+			assistantMessage.providerOptions = mergeProviderOptions(assistantMessage.providerOptions, {
+				openaiCompatible: { reasoning_content: reasoningContent },
+			});
+		}
+		out.push(assistantMessage);
 	}
 
 	return out;
+}
+
+/** The Google provider only supports PNG images inside assistant messages. */
+function isGoogleAssistantPng(image: any): boolean {
+	return typeof image?.mediaType === 'string' && image.mediaType.toLowerCase() === 'image/png';
 }
 
 function simplifyTextOnlyContent(parts: any[]): any {
@@ -442,8 +489,10 @@ function simplifyTextOnlyContent(parts: any[]): any {
 }
 
 function dataPartToAiSdkPart(part: vscode.LanguageModelDataPart): any | undefined {
-	// VS Code may include internal metadata such as cache_control in Agent/Plan mode.
-	if (part.mimeType === 'cache_control') {
+	// VS Code may include internal metadata such as cache_control or the
+	// extension's own usage payload in Agent/Plan mode. Skip them so they are
+	// never forwarded to the model as message content.
+	if (part.mimeType === 'cache_control' || part.mimeType === 'usage') {
 		return undefined;
 	}
 
@@ -452,12 +501,13 @@ function dataPartToAiSdkPart(part: vscode.LanguageModelDataPart): any | undefine
 	}
 
 	if (part.mimeType.startsWith('image/')) {
-		// AI SDK accepts Buffer/Uint8Array.
-		return { type: 'image', image: Buffer.from(part.data), mimeType: part.mimeType };
+		// AI SDK accepts Buffer/Uint8Array. imagePartSchema uses `mediaType`, not `mimeType`.
+		return { type: 'image', image: Buffer.from(part.data), mediaType: part.mimeType };
 	}
 
 	// Fallback: represent as a file.
-	return { type: 'file', data: Buffer.from(part.data), mimeType: part.mimeType };
+	// NOTE: ai-sdk filePartSchema uses `mediaType`, not `mimeType`.
+	return { type: 'file', data: Buffer.from(part.data), mediaType: part.mimeType };
 }
 
 function languageModelToolResultContentToOutput(
@@ -498,7 +548,13 @@ function languageModelToolResultContentToOutput(
 		}
 
 		if (part !== undefined) {
-			parts.push({ type: 'custom', value: part });
+			// Convert unknown parts to text to avoid ModelMessage schema
+			// validation failures (the ai-sdk discriminated union for
+			// ToolResultOutput content does not accept arbitrary `custom`
+			// shapes with a `value` field).
+			const text = String(part);
+			textChunks.push(text);
+			parts.push({ type: 'text', text });
 		}
 	}
 
