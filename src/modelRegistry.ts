@@ -100,8 +100,6 @@ export class ModelRegistry {
 
 		const allModels: { provider: ModelsDevProvider; model: ModelsDevModel; providerId: string; uniqueId: string }[] = [];
 
-		const debugMode = this.isDebugMode();
-
 		const registerModel = (uniqueId: string, model: ModelsDevModel, provider: ModelsDevProvider, providerId: string): void => {
 			this.modelProviderApi.set(uniqueId, providerId);
 			allModels.push({ provider, model, providerId, uniqueId });
@@ -120,6 +118,8 @@ export class ModelRegistry {
 			});
 		};
 
+		const debugMode = this.isDebugMode();
+
 		for (const providerId of PROVIDER_IDS) {
 			const provider = json[providerId];
 			if (!provider) {
@@ -131,13 +131,11 @@ export class ModelRegistry {
 			for (const model of Object.values(provider.models)) {
 				const uniqueId = providerId === 'opencode-go' ? `${model.id}-go` : model.id;
 				if (this.modelProviderApi.get(uniqueId) === undefined) {
-					registerModel(uniqueId, model, provider, providerId);
-				}
-
-				// In debug mode also expose a debug-annotated variant alongside the
-				// installed version so both are available to the debug host.
-				if (debugMode) {
-					registerModel(`debug:${uniqueId}`, model, provider, providerId);
+					if (debugMode) {
+						registerModel(`debug:${uniqueId}`, model, provider, providerId);
+					} else {
+						registerModel(uniqueId, model, provider, providerId);
+					}
 				}
 			}
 		}
@@ -152,7 +150,7 @@ export class ModelRegistry {
 			.filter(({ model }) => isActiveModel(model))
 			.filter(({ model }) => hasKey || model.cost?.input === 0)
 			.sort((a, b) => a.model.name.localeCompare(b.model.name))
-			.map(({ provider, model, providerId, uniqueId }) => this.toChatInfo(provider, model, providerId, uniqueId, debugMode));
+			.map(({ provider, model, providerId, uniqueId }) => this.toChatInfo(provider, model, providerId, uniqueId));
 
 		this.cachedModels = models;
 		this.cachedAtMs = now;
@@ -185,7 +183,7 @@ export class ModelRegistry {
 		};
 	}
 
-	private toChatInfo(provider: ModelsDevProvider, model: ModelsDevModel, providerId: string, uniqueId: string, debugMode: boolean): vscode.LanguageModelChatInformation {
+	private toChatInfo(provider: ModelsDevProvider, model: ModelsDevModel, providerId: string, uniqueId: string): vscode.LanguageModelChatInformation {
 		const maxInputTokens = model.limit?.context ?? 32_768;
 		const maxOutputTokens = model.limit?.output ?? 8_192;
 		const costIn = model.cost?.input;
