@@ -2,8 +2,7 @@
 
 > **Disclaimer:** This project is a community project and is not maintained by the OpenCode team (https://opencode.ai/) and has no ties to the OpenCode team.
 
-
-This extension provides **OpenCode Zen** models to VS Code via the **Language Model Chat Provider** API (vendor id: `opencode-zen`).
+This extension provides **OpenCode Zen** models to VS Code via the **Language Model Chat Provider** API (vendor id: `opencode-zen`). It supports multiple upstream providers (Anthropic, OpenAI, Google, and OpenAI-compatible) through the [models.dev](https://models.dev) registry, with streaming, tool calling, thinking/reasoning, and prompt caching.
 
 ## Prerequisites
 
@@ -30,9 +29,12 @@ npm run watch
 ```
 
 ## Create Extension Package
+
 ```bash
-vsce package
+./scripts/package/build-vsix.sh
 ```
+
+Or directly via `vsce package`.
 
 ## Run (Extension Development Host)
 
@@ -69,8 +71,34 @@ Open the command palette (`Ctrl/Cmd+Shift+P`):
   - Prompts for a model, then runs a small tool-calling roundtrip.
   - Output is written to the **OpenCode Zen** Output Channel.
 
-## Notes
+## Configuration
 
-- Tool calling is supported by streaming `LanguageModelToolCallPart` from the provider.
-- Tool execution is handled by the caller (VS Code) by sending back `LanguageModelToolResultPart` on the next request.
-- If no API key is configured, requests use `apiKey: public` and only free OpenCode Zen models are shown (matching opencode behavior).
+All settings are under `opencodeZen.*` in VS Code Settings (`Ctrl/Cmd+Shift+P` → "Preferences: Open User Settings (JSON)").
+
+### Model Cache
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `opencodeZen.modelCacheTtlMinutes` | `number` | `60` | How long to cache models.dev model metadata before refetching. Set to `0` to disable caching. |
+
+### Prompt Caching
+
+Prompt caching reduces token usage by preserving prefix cache state across requests. Supported for Anthropic, OpenAI, and OpenAI-compatible providers.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `opencodeZen.promptCaching.enabled` | `boolean` | `true` | Enable prompt caching hints for supported providers. |
+| `opencodeZen.promptCaching.retention` | `string` | `"in_memory"` | Retention policy for OpenAI prompt caching. `"24h"` requires a compatible OpenAI model. |
+| `opencodeZen.promptCaching.cacheKeyScope` | `string` | `"workspace"` | Scope for the prompt cache key (`"workspace"`, `"global"`, or `"none"`). |
+| `opencodeZen.promptCaching.anthropicTtl` | `string` | `"5m"` | Anthropic `cache_control` TTL for cached message blocks. `"none"` omits the TTL. |
+
+## Features
+
+- **Multi-provider support** — Routes requests to the appropriate AI SDK (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`, `@ai-sdk/openai-compatible`) based on model metadata from models.dev.
+- **Streaming** — Full streaming support for chat completions.
+- **Tool calling** — Tools defined by VS Code are converted to AI SDK tool schemas. The provider emits `LanguageModelToolCallPart` and VS Code handles execution via `LanguageModelToolResultPart`.
+- **Thinking / reasoning** — Supports the `languageModelThinkingPart` proposed API for models that expose chain-of-thought reasoning.
+- **Prompt caching** — Configurable prompt cache hints (Anthropic, OpenAI, OpenAI-compatible) to reduce token usage across turns.
+- **Context truncation** — Automatically truncates older messages to 85% of the model's `maxInputTokens` to stay within context limits.
+- **Graceful degradation** — If no API key is configured, requests use `apiKey: public` and only free models are shown. If the model registry fails to load, the extension returns an empty model list instead of crashing.
+- **Self-test** — Built-in command that runs a tool-calling roundtrip against any available model, with output in the OpenCode Zen Output Channel.

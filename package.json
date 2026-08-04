@@ -1,6 +1,6 @@
 {
-  "name": "opencode-zen-chat-provider-dev",
-  "publisher": "wienans-dev",
+  "name": "opencode-zen-chat-provider",
+  "publisher": "wienans",
   "displayName": "OpenCode Zen Provider",
   "description": "Provides OpenCode Zen models to VS Code's Language Model API.",
   "version": "0.1.4",
@@ -34,51 +34,51 @@
   "main": "./out/extension.js",
   "activationEvents": [
     "onStartupFinished",
-    "onCommand:opencodeZenDev.setApiKey",
-    "onCommand:opencodeZenDev.clearApiKey",
-    "onCommand:opencodeZenDev.refreshModels",
-    "onCommand:opencodeZenDev.selfTest"
+    "onCommand:opencodeZen.setApiKey",
+    "onCommand:opencodeZen.clearApiKey",
+    "onCommand:opencodeZen.refreshModels",
+    "onCommand:opencodeZen.selfTest"
   ],
   "contributes": {
     "languageModelChatProviders": [
       {
-        "vendor": "opencode-zen-dev",
-        "displayName": "⚠ OpenCode Zen"
+        "vendor": "opencode-zen",
+        "displayName": "OpenCode Zen"
       }
     ],
     "commands": [
       {
-        "command": "opencodeZenDev.setApiKey",
+        "command": "opencodeZen.setApiKey",
         "title": "OpenCode Zen: Set API Key"
       },
       {
-        "command": "opencodeZenDev.clearApiKey",
+        "command": "opencodeZen.clearApiKey",
         "title": "OpenCode Zen: Clear API Key"
       },
       {
-        "command": "opencodeZenDev.refreshModels",
+        "command": "opencodeZen.refreshModels",
         "title": "OpenCode Zen: Refresh Model List"
       },
       {
-        "command": "opencodeZenDev.selfTest",
+        "command": "opencodeZen.selfTest",
         "title": "OpenCode Zen: Self Test"
       }
     ],
     "configuration": {
       "title": "OpenCode Zen",
       "properties": {
-        "opencodeZenDev.modelCacheTtlMinutes": {
+        "opencodeZen.modelCacheTtlMinutes": {
           "type": "number",
           "default": 60,
           "minimum": 0,
           "description": "How long to cache models.dev model metadata before refetching. 0 disables caching."
         },
-        "opencodeZenDev.promptCaching.enabled": {
+        "opencodeZen.promptCaching.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable prompt caching hints for supported providers (Anthropic, OpenAI, OpenAI-compatible)."
         },
-        "opencodeZenDev.promptCaching.retention": {
+        "opencodeZen.promptCaching.retention": {
           "type": "string",
           "enum": [
             "in_memory",
@@ -87,7 +87,7 @@
           "default": "in_memory",
           "description": "Retention policy for OpenAI prompt caching. '24h' requires a compatible OpenAI model."
         },
-        "opencodeZenDev.promptCaching.cacheKeyScope": {
+        "opencodeZen.promptCaching.cacheKeyScope": {
           "type": "string",
           "enum": [
             "workspace",
@@ -97,7 +97,7 @@
           "default": "workspace",
           "description": "Scope for the prompt cache key used by OpenAI/OpenAI-compatible providers."
         },
-        "opencodeZenDev.promptCaching.anthropicTtl": {
+        "opencodeZen.promptCaching.anthropicTtl": {
           "type": "string",
           "enum": [
             "5m",
@@ -132,6 +132,5 @@
     "eslint": "^9.13.0",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.39.0"
-  },
-  "x-dev-marker-debug": true
+  }
 }
