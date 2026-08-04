@@ -5,7 +5,7 @@ import { getApiKey } from './secrets';
 import { ModelRegistry } from './modelRegistry';
 import { OPENAI_COMPAT_PROVIDER_NAME, streamZen } from './zenClient';
 import { getOutputChannel } from './output';
-import { getRuntimeConfigurationNamespace, getRuntimeVendorId } from './runtimeMode';
+import { getRuntimeConfigurationNamespace, getRuntimeVendorId, isDebugModeFromDisk } from './runtimeMode';
 
 export const VENDOR_ID = getRuntimeVendorId();
 
@@ -125,6 +125,7 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 			logDebugRequest(model, requestModelId, requestToolMode, options, coreMessages, tools, providerInfo, providerOptions);
 		}
 
+		const extensionDebugMode = isDebugModeFromDisk();
 		try {
 			await streamZen(
 				{
@@ -145,12 +146,14 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 				{
 					onTextDelta: (delta) => {
 						if (delta) {
-							progress.report(new vscode.LanguageModelTextPart(delta));
+							const prefixed = extensionDebugMode ? `===DEBUG===${delta}` : delta;
+							progress.report(new vscode.LanguageModelTextPart(prefixed));
 						}
 					},
 					onThinkingDelta: (delta) => {
 						if (delta) {
-							progress.report(new vscode.LanguageModelThinkingPart(delta));
+							const prefixed = extensionDebugMode ? `===DEBUG===${delta}` : delta;
+							progress.report(new vscode.LanguageModelThinkingPart(prefixed));
 						}
 					},
 					onToolCall: ({ toolCallId, toolName, input }) => {
