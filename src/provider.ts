@@ -149,7 +149,7 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 						if (delta) {
 							if (extensionDebugMode && !debugPrefixEmitted) {
 								debugPrefixEmitted = true;
-								progress.report(new vscode.LanguageModelTextPart(`===DEBUG===${delta}`));
+								progress.report(new vscode.LanguageModelTextPart(`🛠️ ${delta}`));
 							} else {
 								progress.report(new vscode.LanguageModelTextPart(delta));
 							}
@@ -159,7 +159,7 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 						if (delta) {
 							if (extensionDebugMode && !debugPrefixEmitted) {
 								debugPrefixEmitted = true;
-								progress.report(new vscode.LanguageModelThinkingPart(`===DEBUG===${delta}`));
+								progress.report(new vscode.LanguageModelThinkingPart(`🛠️ ${delta}`));
 							} else {
 								progress.report(new vscode.LanguageModelThinkingPart(delta));
 							}
