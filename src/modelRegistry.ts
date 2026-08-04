@@ -100,6 +100,26 @@ export class ModelRegistry {
 
 		const allModels: { provider: ModelsDevProvider; model: ModelsDevModel; providerId: string; uniqueId: string }[] = [];
 
+		const debugMode = this.isDebugMode();
+
+		const registerModel = (uniqueId: string, model: ModelsDevModel, provider: ModelsDevProvider, providerId: string): void => {
+			this.modelProviderApi.set(uniqueId, providerId);
+			allModels.push({ provider, model, providerId, uniqueId });
+
+			const npmOverride = providerId === 'opencode-go' ? OPENCODE_GO_NPM_OVERRIDES[model.id] : undefined;
+			if (npmOverride) {
+				this.modelProviderOverrides.set(uniqueId, npmOverride);
+			} else if (model.provider?.npm) {
+				this.modelProviderOverrides.set(uniqueId, model.provider.npm);
+			}
+
+			this.modelRequestMetadata.set(uniqueId, {
+					headers: model.headers,
+					options: model.options,
+					originalModelId: model.id,
+			});
+		};
+
 		for (const providerId of PROVIDER_IDS) {
 			const provider = json[providerId];
 			if (!provider) {
@@ -111,22 +131,14 @@ export class ModelRegistry {
 			for (const model of Object.values(provider.models)) {
 				const uniqueId = providerId === 'opencode-go' ? `${model.id}-go` : model.id;
 				if (this.modelProviderApi.get(uniqueId) === undefined) {
-					this.modelProviderApi.set(uniqueId, providerId);
-					allModels.push({ provider, model, providerId, uniqueId });
-
-					const npmOverride = providerId === 'opencode-go' ? OPENCODE_GO_NPM_OVERRIDES[model.id] : undefined;
-					if (npmOverride) {
-						this.modelProviderOverrides.set(uniqueId, npmOverride);
-					} else if (model.provider?.npm) {
-						this.modelProviderOverrides.set(uniqueId, model.provider.npm);
-					}
+					registerModel(uniqueId, model, provider, providerId);
 				}
 
-				this.modelRequestMetadata.set(uniqueId, {
-					headers: model.headers,
-					options: model.options,
-					originalModelId: model.id,
-				});
+				// In debug mode also expose a debug-annotated variant alongside the
+				// installed version so both are available to the debug host.
+				if (debugMode) {
+					registerModel(`debug:${uniqueId}`, model, provider, providerId);
+				}
 			}
 		}
 
@@ -140,7 +152,7 @@ export class ModelRegistry {
 			.filter(({ model }) => isActiveModel(model))
 			.filter(({ model }) => hasKey || model.cost?.input === 0)
 			.sort((a, b) => a.model.name.localeCompare(b.model.name))
-			.map(({ provider, model, providerId, uniqueId }) => this.toChatInfo(provider, model, providerId, uniqueId));
+			.map(({ provider, model, providerId, uniqueId }) => this.toChatInfo(provider, model, providerId, uniqueId, debugMode));
 
 		this.cachedModels = models;
 		this.cachedAtMs = now;
@@ -173,13 +185,15 @@ export class ModelRegistry {
 		};
 	}
 
-	private toChatInfo(provider: ModelsDevProvider, model: ModelsDevModel, providerId: string, uniqueId: string): vscode.LanguageModelChatInformation {
+	private toChatInfo(provider: ModelsDevProvider, model: ModelsDevModel, providerId: string, uniqueId: string, debugMode: boolean): vscode.LanguageModelChatInformation {
 		const maxInputTokens = model.limit?.context ?? 32_768;
 		const maxOutputTokens = model.limit?.output ?? 8_192;
 		const costIn = model.cost?.input;
 		const costOut = model.cost?.output;
 		const isGo = providerId === 'opencode-go';
-		const modelName = isGo ? `${model.name} (Go)` : model.name;
+		const rawModelName = isGo ? `${model.name} (Go)` : model.name;
+		const isDebugVariant = uniqueId.startsWith('debug:');
+		const modelName = isDebugVariant ? `🔧 ${rawModelName}` : rawModelName;
 		const tooltipBits: string[] = [
 			provider.name + (isGo ? ' (Go)' : ''),
 			model.reasoning ? 'Reasoning' : undefined,
@@ -201,5 +215,17 @@ export class ModelRegistry {
 				imageInput: model.attachment,
 			},
 		};
+	}
+
+	private isDebugMode(): boolean {
+		// Read from disk instead of the cached packageJSON so that dev-marker.js
+		// unmark takes effect without requiring a window reload.
+		try {
+			const fs = require('fs') as typeof import('fs');
+			const raw = fs.readFileSync(this.context.extensionUri.fsPath + '/package.json', 'utf8');
+			return Boolean(JSON.parse(raw)['x-dev-marker-debug']);
+		} catch {
+			return false;
+		}
 	}
 }

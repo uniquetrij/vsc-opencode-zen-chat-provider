@@ -121,7 +121,7 @@ function normalizeToString(value: unknown): string {
 	}
 }
 
-export const OPENAI_COMPAT_PROVIDER_NAME = 'opencode-zen';
+export const OPENAI_COMPAT_PROVIDER_NAME = 'opencode';
 
 export async function streamZen(
 	options: {
@@ -348,11 +348,11 @@ function extractCompatibleProviderOptions(args: Record<string, any>): Record<str
 		snake?.[OPENAI_COMPAT_PROVIDER_NAME],
 		snake?.openaiCompatible,
 		snake?.opencode,
-		snake?.['opencode-zen'],
+		snake?.['opencode'],
 		camel?.[OPENAI_COMPAT_PROVIDER_NAME],
 		camel?.openaiCompatible,
 		camel?.opencode,
-		camel?.['opencode-zen'],
+		camel?.['opencode'],
 	];
 
 	for (const candidate of candidates) {

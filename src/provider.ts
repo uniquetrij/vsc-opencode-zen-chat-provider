@@ -6,7 +6,7 @@ import { ModelRegistry } from './modelRegistry';
 import { OPENAI_COMPAT_PROVIDER_NAME, streamZen } from './zenClient';
 import { getOutputChannel } from './output';
 
-export const VENDOR_ID = 'opencode-zen';
+export const VENDOR_ID = 'opencode';
 
 export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly registry: ModelRegistry;
@@ -685,7 +685,7 @@ async function getOrCreateRequestMetadata(
 	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 	const projectId = workspaceFolder?.name || 'default';
 	const requestId = randomUUID();
-	const client = `vscode-opencode-zen/${context.extension.packageJSON.version}`;
+	const client = `vscode-opencode/${context.extension.packageJSON.version}`;
 
 	const overriddenSessionId = tryGetModelOptionString(options.modelOptions, 'sessionID')
 		?? tryGetModelOptionString(options.modelOptions, 'sessionId');
