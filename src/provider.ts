@@ -9,6 +9,15 @@ import { getRuntimeConfigurationNamespace, getRuntimeVendorId, isDebugModeFromDi
 
 export const VENDOR_ID = getRuntimeVendorId();
 
+// Reasoning models served through OpenAI-compatible endpoints (e.g. DeepSeek
+// thinking mode) require the assistant turn's `reasoning_content` to be echoed
+// back on the following request, or they reject it with a 400. We normally get
+// that content from VS Code's `LanguageModelThinkingPart` in the history, but
+// VS Code may strip thinking after context truncation/summarization. Keep the
+// most recent assistant reasoning per (session, model) so we can re-attach it
+// as a fallback.
+const sessionReasoningCache = new Map<string, Map<string, string>>();
+
 export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider {
 	private readonly registry: ModelRegistry;
 	private readonly onDidChangeEmitter = new vscode.EventEmitter<void>();
@@ -121,12 +130,20 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 		}
 		cachedMessages = truncatedMessages;
 
+		// Fallback: re-attach the previous assistant turn's reasoning if VS Code
+		// dropped it from history (reasoning models reject if it is missing).
+		const cachedReasoning = sessionReasoningCache.get(requestMeta.sessionId)?.get(requestModelId);
+		if (cachedReasoning) {
+			cachedMessages = applyReasoningFallback(cachedMessages, cachedReasoning);
+		}
+
 		if (debugFlag) {
 			logDebugRequest(model, requestModelId, requestToolMode, options, coreMessages, tools, providerInfo, providerOptions);
 		}
 
 		const extensionDebugMode = isDebugModeFromDisk();
 		let debugPrefixEmitted = false;
+		let lastReasoning = '';
 		try {
 			await streamZen(
 				{
@@ -157,6 +174,7 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 					},
 					onThinkingDelta: (delta) => {
 						if (delta) {
+							lastReasoning += delta;
 							if (extensionDebugMode && !debugPrefixEmitted) {
 								debugPrefixEmitted = true;
 								progress.report(new vscode.LanguageModelThinkingPart(`🛠️ ${delta}`));
@@ -185,6 +203,17 @@ export class OpenCodeZenChatProvider implements vscode.LanguageModelChatProvider
 					},
 				}
 			);
+
+			// Cache the reasoning we just received so the NEXT turn can echo it
+			// back even if VS Code strips the thinking part from history.
+			if (lastReasoning) {
+				let perModel = sessionReasoningCache.get(requestMeta.sessionId);
+				if (!perModel) {
+					perModel = new Map<string, string>();
+					sessionReasoningCache.set(requestMeta.sessionId, perModel);
+				}
+				perModel.set(requestModelId, lastReasoning);
+			}
 		} catch (err) {
 			if (debugFlag) {
 				logDebugError(model, requestModelId, requestToolMode, options, coreMessages, tools, providerInfo, err);
@@ -483,6 +512,47 @@ function mapVsCodeMessageToAiSdkMessages(
 	}
 
 	return out;
+}
+
+/**
+ * Defense-in-depth: if VS Code stripped the previous assistant turn's thinking
+ * part from history (e.g. after context truncation/reload), re-attach the
+ * reasoning we captured from that turn so OpenAI-style reasoning models
+ * (DeepSeek thinking mode) don't reject the next request with a 400.
+ */
+function applyReasoningFallback(messages: any[], reasoning: string): any[] {
+	if (!reasoning || !Array.isArray(messages) || messages.length === 0) {
+		return messages;
+	}
+
+	// DeepSeek thinking mode pairs `reasoning_content` with whichever assistant
+	// message produced the prior reasoning — in agent mode that may be a tool-call
+	// message, not just a plain-text one. Attach to the most recent assistant
+	// message that doesn't already carry reasoning. Skip nothing (a trailing
+	// user message stays as-is).
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const message = messages[i];
+		if (!message || message.role !== 'assistant') {
+			continue;
+		}
+
+		const existing = (message.providerOptions as Record<string, any> | undefined)
+			?.openaiCompatible?.reasoning_content;
+		if (existing) {
+			// Reasoning already echoed — nothing more to do.
+			return messages;
+		}
+
+		messages[i] = {
+			...message,
+			providerOptions: mergeProviderOptions(message.providerOptions, {
+				openaiCompatible: { reasoning_content: reasoning },
+			}),
+		};
+		return messages;
+	}
+
+	return messages;
 }
 
 /** The Google provider only supports PNG images inside assistant messages. */

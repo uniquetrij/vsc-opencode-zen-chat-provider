@@ -203,10 +203,20 @@ export async function streamZen(
 			// thinking callback so VS Code surfaces them as thinking content.
 			// Inspired by highvoltz's proof-of-concept (issue #8):
 			// https://github.com/highvoltz/vsc-opencode-zen-chat-provider/commit/33410a4
+			//
+			// NOTE (ai-sdk v6): `fullStream`'s `reasoning-delta` part carries its
+			// text in the `text` field (the provider-level `delta` is renamed to
+			// `text` by the SDK's stream transform). The `text`-vs-`delta` naming
+			// is inconsistent across SDK versions, so accept both defensively.
+			// Capturing this reasoning is important: OpenAI-style reasoning models
+			// (DeepSeek thinking mode) require the prior assistant turn's
+			// `reasoning_content` to be echoed back or they reject the follow-up
+			// request with a 400.
 			if (part.type === 'reasoning-delta') {
-				if (part.text && part.text.length > 0) {
+				const reasoning = part.text ?? (part as any).delta;
+				if (reasoning && reasoning.length > 0) {
 					emitted = true;
-					callbacks.onThinkingDelta(part.text);
+					callbacks.onThinkingDelta(reasoning);
 				}
 				continue;
 			}
