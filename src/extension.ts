@@ -40,16 +40,19 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand(COMMAND_REFRESH_MODELS, async () => {
 			output.info('Refreshing model list...');
 			await provider.refreshModels(true);
-			let modelCount: number | undefined;
 			if (vscode.lm?.selectChatModels) {
 				try {
 					const models = await vscode.lm.selectChatModels({ vendor: VENDOR_ID });
-					modelCount = models.length;
+					output.info(`Model list refreshed: ${models.length} model(s) available.`);
+					for (const model of models) {
+						output.info(`  - ${model.name} (${model.id})`);
+					}
 				} catch (err) {
-					output.error(`Failed to count models after refresh: ${err instanceof Error ? err.message : String(err)}`);
+					output.error(`Failed to list models after refresh: ${err instanceof Error ? err.message : String(err)}`);
 				}
+			} else {
+				output.info('Model list refreshed.');
 			}
-			output.info(modelCount !== undefined ? `Model list refreshed: ${modelCount} model(s) available.` : 'Model list refreshed.');
 			vscode.window.showInformationMessage('OpenCode Zen model list refreshed.');
 		}),
 		vscode.commands.registerCommand(COMMAND_SELF_TEST, async () => {
