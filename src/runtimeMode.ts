@@ -6,9 +6,9 @@ const DEBUG_MARKER_PROPERTY = 'x-dev-marker-debug';
 export const BASE_VENDOR_ID = 'opencode-zen';
 export const DEBUG_VENDOR_ID = 'opencode-zen-dev';
 export const BASE_COMMAND_NAMESPACE = 'opencodeZen';
-export const DEBUG_COMMAND_NAMESPACE = 'opencodeZenDev';
+export const DEBUG_COMMAND_NAMESPACE = 'dev.opencodeZen';
 export const BASE_CONFIGURATION_NAMESPACE = 'opencodeZen';
-export const DEBUG_CONFIGURATION_NAMESPACE = 'opencodeZenDev';
+export const DEBUG_CONFIGURATION_NAMESPACE = 'dev.opencodeZen';
 
 export function isDebugModeFromDisk(): boolean {
     try {

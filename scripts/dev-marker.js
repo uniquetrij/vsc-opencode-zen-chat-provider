@@ -15,7 +15,7 @@ const path = require('path');
 const DEBUG_MARKER_PROPERTY = 'x-dev-marker-debug';
 const DEV_SUFFIX = '-dev';
 const BASE_NAMESPACE = 'opencodeZen';
-const DEV_NAMESPACE = 'opencodeZenDev';
+const DEV_NAMESPACE = 'dev.opencodeZen';
 const mode = process.argv[2];
 
 if (mode !== 'mark' && mode !== 'unmark') {
@@ -123,6 +123,16 @@ if (Array.isArray(commands)) {
         if (nextCommand !== command.command) {
             command.command = nextCommand;
             changed = true;
+        }
+
+        // Strip any existing prefix first so repeated calls are idempotent.
+        if (typeof command.title === 'string') {
+            const strippedTitle = command.title.replace(/^🔧 /, '');
+            const nextTitle = mode === 'mark' ? '🔧 ' + strippedTitle : strippedTitle;
+            if (nextTitle !== command.title) {
+                command.title = nextTitle;
+                changed = true;
+            }
         }
     }
 }

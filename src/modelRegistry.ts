@@ -134,7 +134,7 @@ export class ModelRegistry {
 				const uniqueId = providerId === 'opencode-go' ? `${model.id}-go` : model.id;
 				if (this.modelProviderApi.get(uniqueId) === undefined) {
 					if (debugMode) {
-						registerModel(`debug:${uniqueId}`, model, provider, providerId);
+						registerModel(`dev:${uniqueId}`, model, provider, providerId);
 					} else {
 						registerModel(uniqueId, model, provider, providerId);
 					}
@@ -192,7 +192,7 @@ export class ModelRegistry {
 		const costOut = model.cost?.output;
 		const isGo = providerId === 'opencode-go';
 		const rawModelName = isGo ? `${model.name} (Go)` : model.name;
-		const isDebugVariant = uniqueId.startsWith('debug:');
+		const isDebugVariant = uniqueId.startsWith('dev:');
 		const modelName = isDebugVariant ? `🔧 ${rawModelName}` : rawModelName;
 		const tooltipBits: string[] = [
 			provider.name + (isGo ? ' (Go)' : ''),
