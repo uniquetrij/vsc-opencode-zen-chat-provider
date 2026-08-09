@@ -122,6 +122,46 @@ function normalizeToString(value: unknown): string {
 	}
 }
 
+/**
+ * Normalize a tool-call `input` into a JSON object that providers accept.
+ *
+ * The `@ai-sdk/openai-compatible` provider passes `function.arguments` through
+ * as a raw JSON *string* (see its `input: toolCall.function.arguments`), and
+ * our own message mapping later re-serializes `input` with `JSON.stringify`.
+ * If a string slips through, the upstream rejects the request with
+ * "Assistant tool call function.arguments must be a JSON object" (400) because
+ * the parsed value is a string, not an object.
+ */
+export function normalizeToolCallInput(input: unknown): Record<string, any> {
+	if (input && typeof input === 'object' && !Array.isArray(input)) {
+		// Already a (tool-schema-valid) object — pass through unchanged.
+		return input as Record<string, any>;
+	}
+
+	if (typeof input === 'string') {
+		const trimmed = input.trim();
+		if (trimmed === '') {
+			return {};
+		}
+		try {
+			const parsed: unknown = JSON.parse(trimmed);
+			if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+				return parsed as Record<string, any>;
+			}
+		} catch {
+			// Not JSON — fall through and wrap it.
+		}
+		return { value: input };
+	}
+
+	if (input === undefined || input === null) {
+		return {};
+	}
+
+	// Numbers, booleans, arrays, etc.: wrap so we still send an object.
+	return { value: input };
+}
+
 export const OPENAI_COMPAT_PROVIDER_NAME = getRuntimeVendorId();
 
 export async function streamZen(
@@ -226,7 +266,7 @@ export async function streamZen(
 				callbacks.onToolCall({
 					toolCallId: part.toolCallId,
 					toolName: options.toolNameMap?.get(part.toolName) ?? part.toolName,
-					input: (part.input ?? {}) as object,
+					input: normalizeToolCallInput(part.input),
 				});
 				continue;
 			}

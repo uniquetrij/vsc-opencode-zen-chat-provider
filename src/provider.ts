@@ -3,7 +3,7 @@ import { jsonSchema } from 'ai';
 import * as vscode from 'vscode';
 import { getApiKey } from './secrets';
 import { ModelRegistry } from './modelRegistry';
-import { OPENAI_COMPAT_PROVIDER_NAME, streamZen } from './zenClient';
+import { normalizeToolCallInput, OPENAI_COMPAT_PROVIDER_NAME, streamZen } from './zenClient';
 import { getOutputChannel } from './output';
 import { getRuntimeConfigurationNamespace, getRuntimeVendorId, isDebugModeFromDisk } from './runtimeMode';
 
@@ -426,7 +426,7 @@ function mapVsCodeMessageToAiSdkMessages(
 				type: 'tool-call',
 				toolCallId: part.callId,
 				toolName: mapToolName(part.name, toolNameMap),
-				input: part.input,
+				input: normalizeToolCallInput(part.input),
 			});
 			continue;
 		}

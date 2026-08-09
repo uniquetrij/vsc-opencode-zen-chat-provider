@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## UNRELEASED [x.x.x] - xxxx-xx-xx
+## [0.1.6] - 2026-08-10
+
+### Fixed
+
+- Fix HTTP 400 "Assistant tool call function.arguments must be a JSON object"
+  from the OpenCode (Console) upstream. Tool-call input from
+  `@ai-sdk/openai-compatible` is passed through as a raw JSON string; it is now
+  normalized into a JSON object before being reported to VS Code and again
+  before being sent back to the API on the next turn.
 
 ## [0.1.3] - 2026-01-27
 
